@@ -699,6 +699,16 @@ if features['libarchive']
                      'stream/stream_libarchive.c')
 endif
 
+# liborender is loaded at runtime (dlopen) against the vendored ABI header
+# common/orender_abi.h — no build-time library or pkg-config dependency. See
+# common/orender_dl.c for the search order and the version handshake.
+features += {'orender': get_option('orender').allowed()}
+if features['orender']
+    sources += files('audio/decode/ad_orender.c',
+                     'common/orender_dl.c',
+                     'player/orender_overlay.c')
+endif
+
 libavdevice = dependency('libavdevice', version: '>= 60.3.100', required: get_option('libavdevice'))
 features += {'libavdevice': libavdevice.found()}
 if features['libavdevice']
@@ -957,6 +967,33 @@ if features['wasapi']
     sources += files('audio/out/ao_wasapi.c',
                      'audio/out/ao_wasapi_changenotify.c',
                      'audio/out/ao_wasapi_utils.c')
+endif
+
+# ao_asio includes Steinberg's ASIO SDK headers under the GPLv3 half of the
+# SDK's dual licence, so it is a GPL-only file like ao_jack. Point -Dasio-sdk
+# at the SDK root (the directory holding common/asio.h): only the headers are
+# used, none of the SDK sources are compiled.
+asio_opt = get_option('asio').require(win32).require(
+    get_option('gpl'),
+    error_message: 'the build is not GPL!',
+)
+asio_sdk = get_option('asio-sdk')
+asio = false
+if asio_sdk != ''
+    asio = cc.has_header('objbase.h', required: asio_opt) and \
+           cc.has_header('asio.h', args: ['-I' + asio_sdk / 'common'],
+                         required: asio_opt)
+elif asio_opt.enabled()
+    error('-Dasio=enabled needs -Dasio-sdk=<path to the ASIO SDK>; ' +
+          'get it from https://github.com/audiosdk/asio')
+endif
+features += {'asio': asio}
+if features['asio']
+    sources += files('audio/out/ao_asio.c')
+    dependencies += declare_dependency(
+        compile_args: ['-I' + asio_sdk / 'common'],
+    )
+    dependencies += cc.find_library('advapi32', required: false)
 endif
 
 
