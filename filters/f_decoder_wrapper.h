@@ -81,6 +81,9 @@ enum dec_ctrl {
     // int*: extra hw surfaces retained
     VDCTRL_SET_EXTRA_HW_FRAMES,
     VDCTRL_CHECK_FORCED_EOF,
+    // struct mp_aframe*: this frame of the decoder's is about to be handed
+    // to the audio output (ad_iamf_iec61937.c)
+    ADCTRL_IAMF_BURST_SENT,
 };
 
 int mp_decoder_wrapper_control(struct mp_decoder_wrapper *d,
