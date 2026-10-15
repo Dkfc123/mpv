@@ -76,6 +76,10 @@ extern const struct m_sub_options demux_sbr_conf;
 #endif
 extern const struct m_sub_options vd_lavc_conf;
 extern const struct m_sub_options ad_lavc_conf;
+#if HAVE_ORENDER
+extern const struct m_sub_options ad_orender_conf;
+extern const struct m_sub_options ad_iamf_iec61937_conf;
+#endif
 extern const struct m_sub_options hwdec_conf;
 extern const struct m_sub_options input_config;
 extern const struct m_sub_options encode_config;
@@ -713,6 +717,10 @@ static const m_option_t mp_opts[] = {
     {"", OPT_SUBSTRUCT(dec_wrapper, dec_wrapper_conf)},
     {"", OPT_SUBSTRUCT(vd_lavc_params, vd_lavc_conf)},
     {"ad-lavc", OPT_SUBSTRUCT(ad_lavc_params, ad_lavc_conf)},
+#if HAVE_ORENDER
+    {"ad-orender", OPT_SUBSTRUCT(ad_orender_params, ad_orender_conf)},
+    {"ad-iamf-iec61937", OPT_SUBSTRUCT(ad_iamf_iec61937_params, ad_iamf_iec61937_conf)},
+#endif
 
     {"", OPT_SUBSTRUCT(hwdec_opts, hwdec_conf)},
 

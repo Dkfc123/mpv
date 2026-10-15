@@ -127,6 +127,7 @@ typedef struct mkv_track {
 
     double default_duration;
     double codec_delay;
+    double seek_preroll;   // SeekPreRoll, seconds (0 when absent)
 
     int default_track;
     int forced_track;
@@ -998,6 +999,8 @@ static void parse_trackentry(struct demuxer *demuxer,
 
     if (entry->n_codec_delay)
         track->codec_delay = entry->codec_delay / 1e9;
+    if (entry->n_seek_pre_roll)
+        track->seek_preroll = entry->seek_pre_roll / 1e9;
 
     if (entry->n_block_addition_mapping) {
         parse_block_addition_mapping(demuxer, track,
@@ -1923,6 +1926,11 @@ static const char *const mkv_audio_tags[][2] = {
     { "A_TTA1",                 "tta" },
     { "A_MLP",                  "mlp" },
     { "A_ATRAC/AT1",            "atrac1" },
+    // AOMedia IAMF (immersive audio). Proposed mapping, not yet in the
+    // Matroska codec registry: CodecPrivate is the ISO-BMFF
+    // IAConfigurationBox payload, each Block one temporal unit. No lavc
+    // decoder: only --ad=orender plays it.
+    { "A_IAMF",                 "iamf" },
     { NULL },
 };
 
@@ -2178,6 +2186,11 @@ static int demux_mkv_open_audio(demuxer_t *demuxer, mkv_track_t *track, int idx)
     sh_a->extradata_size = extradata_len;
 
     sh->seek_preroll = track->codec_delay;
+    // IAMF states its codec pre-roll (80 ms for 20 ms Opus frames) in
+    // SeekPreRoll, which is what a seek must decode ahead of its target;
+    // CodecDelay is only its start trim.
+    if (strcmp(codec, "iamf") == 0 && track->seek_preroll > sh->seek_preroll)
+        sh->seek_preroll = track->seek_preroll;
 
     demux_add_sh_stream(demuxer, sh);
 
@@ -3204,8 +3217,17 @@ static int handle_block(demuxer_t *demuxer, struct block_info *block_info)
                 dp->duration = block_duration / 1e9;
             if (stream->type == STREAM_AUDIO) {
                 unsigned int srate = stream->codec->samplerate;
-                demux_packet_set_padding(dp, 0,
-                    block_info->discardpadding / 1e9 * srate);
+                // IAMF trims in band: its Audio Frame OBUs carry the end
+                // trim and the decoder drops those samples itself. A muxer
+                // following the A_IAMF mapping restates that trim as
+                // DiscardPadding for players that cannot decode the track,
+                // so applying it here would trim the end twice. CodecDelay
+                // is still subtracted from the timestamps above: it only
+                // places the first kept sample at 0, as for Opus.
+                double padding = block_info->discardpadding / 1e9 * srate;
+                if (strcmp(stream->codec->codec, "iamf") == 0)
+                    padding = 0;
+                demux_packet_set_padding(dp, 0, padding);
                 mkv_d->a_skip_preroll = 0;
             }
             if (block_info->additions) {

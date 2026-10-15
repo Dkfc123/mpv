@@ -22,6 +22,7 @@
 #include <math.h>
 #include <assert.h>
 
+#include "config.h"
 #include "mpv_talloc.h"
 
 #include "common/msg.h"
@@ -39,6 +40,10 @@
 
 #include "core.h"
 #include "command.h"
+#if HAVE_ORENDER
+#include "audio/decode/ad_iamf_iec61937.h"
+#include "audio/decode/ad_orender.h"
+#endif
 
 enum {
     AD_OK = 0,
@@ -748,6 +753,19 @@ static void ao_process(struct mp_filter *f)
             MP_VERBOSE(mpctx, "previous audio still playing; continuing\n");
         }
 
+#if HAVE_ORENDER
+        // Past every drop: the first IAMF burst sent after a (re)start is
+        // the one that opens the sequence at the receiver. Its decoder
+        // knows whether one is pending; only bursts that lead with a copy
+        // of the descriptors are worth asking about (those of the quarter
+        // second after a restart, then one per copy interval).
+        if (ao_c->track && ao_c->track->dec &&
+            ad_iamf_iec61937_leads_with_copy(af))
+        {
+            mp_decoder_wrapper_control(ao_c->track->dec,
+                                       ADCTRL_IAMF_BURST_SENT, af);
+        }
+#endif
         mp_pin_in_write(ao_c->queue_filter->pins[0], frame);
     } else if (frame.type == MP_FRAME_EOF) {
         MP_VERBOSE(mpctx, "audio filter EOF\n");
@@ -874,6 +892,12 @@ void fill_audio_out_buffers(struct MPContext *mpctx)
         reload_audio_output(mpctx);
 
     update_throttle(mpctx);
+
+#if HAVE_ORENDER
+    // Where the listener is, for the Omniphony engine to tell Studio.
+    ad_orender_set_playing_pts(mpctx->audio_status == STATUS_PLAYING
+                               ? playing_audio_pts(mpctx) : MP_NOPTS_VALUE);
+#endif
 
     struct ao_chain *ao_c = mpctx->ao_chain;
     if (!ao_c)
