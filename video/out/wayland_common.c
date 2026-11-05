@@ -1906,7 +1906,9 @@ static void apply_toplevel_config(struct vo_wayland_state *wl)
                                    opts->autofit_larger.wh_valid || opts->autofit_smaller.wh_valid;
         if (width && height && !autofit_or_geometry) {
             wl->initial_size_hint = true;
-            wl->window_size = (struct mp_rect){0, 0, width, height};
+            wl->window_size = (struct mp_rect){0, 0,
+                handle_round(wl->scaling, width), handle_round(wl->scaling, height)
+            };
             wl->geometry = wl->window_size;
         } else {
             wl->override_surface_local = true;
@@ -3692,7 +3694,6 @@ static void set_color_management(struct vo_wayland_state *wl, struct pl_color_sp
         goto nosupport;
 
     struct wp_image_description_v1 *image_description;
-#if PL_API_VER >= 362
     // scRGB has dedicated creator, and not using the generic one.
     if (color->transfer == PL_COLOR_TRC_SCRGB && wl->supports_scrgb) {
         // Windows-scRGB is defined with sRGB (BT.709) primaries; wide-gamut
@@ -3705,7 +3706,6 @@ static void set_color_management(struct vo_wayland_state *wl, struct pl_color_sp
         cm_dispatch_color_queue(wl, image_description);
         return;
     }
-#endif
 
     int primaries = wl->primaries_map[color->primaries];
     int transfer = wl->transfer_map[color->transfer];
