@@ -3223,6 +3223,7 @@ static int handle_block(demuxer_t *demuxer, struct block_info *block_info)
             if (i == 0 && block_info->duration_known)
                 dp->duration = block_duration / 1e9;
             if (stream->type == STREAM_AUDIO) {
+<<<<<<< ours
                 int64_t padding = av_rescale(block_info->discardpadding,
                                              stream->codec->samplerate,
                                              1000000000);
@@ -3234,6 +3235,20 @@ static int handle_block(demuxer_t *demuxer, struct block_info *block_info)
                 if (padding > 0 && i == block_info->num_laces - 1)
                     end = padding;
                 demux_packet_set_padding(dp, start, end);
+=======
+                unsigned int srate = stream->codec->samplerate;
+                // IAMF trims in band: its Audio Frame OBUs carry the end
+                // trim and the decoder drops those samples itself. A muxer
+                // following the A_IAMF mapping restates that trim as
+                // DiscardPadding for players that cannot decode the track,
+                // so applying it here would trim the end twice. CodecDelay
+                // is still subtracted from the timestamps above: it only
+                // places the first kept sample at 0, as for Opus.
+                double padding = block_info->discardpadding / 1e9 * srate;
+                if (strcmp(stream->codec->codec, "iamf") == 0)
+                    padding = 0;
+                demux_packet_set_padding(dp, 0, padding);
+>>>>>>> theirs
                 mkv_d->a_skip_preroll = 0;
             }
             if (block_info->additions) {
