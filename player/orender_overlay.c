@@ -367,12 +367,11 @@ void mp_orender_overlay_start(struct MPContext *mpctx)
 
     /* Created before the thread so a destroyed MPContext can't race the
      * client creation (same pattern as scripting.c). */
-    mpv_handle *client = mp_new_client(mpctx->clients, "omniphony_overlay");
+    mpv_handle *client = mp_new_weak_client(mpctx->clients, "omniphony_overlay");
     if (!client) {
         MP_ERR(mpctx, "orender overlay: failed to create client\n");
         return;
     }
-    mp_client_set_weak(client);
 
     struct overlay_ctx *ctx = talloc_zero(NULL, struct overlay_ctx);
     ctx->log = mp_client_get_log(client);
